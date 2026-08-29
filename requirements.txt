@@ -6,3 +6,5 @@ pydantic==2.11.7
 python-multipart==0.0.20
 pytest==8.4.1
 httpx==0.28.1
+scikit-learn
+joblib
