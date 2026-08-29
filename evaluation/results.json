@@ -1,0 +1,15 @@
+{
+  "records_evaluated": 100,
+  "true_positives": 85,
+  "false_positives": 0,
+  "false_negatives": 3,
+  "precision": 1.0,
+  "recall": 0.9659,
+  "f1": 0.9827,
+  "status_counts": {
+    "matched": 85,
+    "review": 7,
+    "unresolved": 5,
+    "excluded": 3
+  }
+}
