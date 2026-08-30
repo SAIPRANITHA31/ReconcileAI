@@ -127,3 +127,96 @@
     flex-direction: column;
   }
 }
+
+.review-controls {
+  margin-top: 18px;
+}
+
+.review-controls label {
+  display: block;
+  margin-bottom: 8px;
+  color: #344158;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.review-controls textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #cfd7e4;
+  border-radius: 9px;
+  color: #172033;
+  background: white;
+  font: inherit;
+  resize: vertical;
+}
+
+.review-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 13px;
+}
+
+.approve-button,
+.reject-button {
+  padding: 10px 15px;
+  border: 0;
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.approve-button {
+  background: #218653;
+}
+
+.reject-button {
+  background: #bd3c3c;
+}
+
+.approve-button:disabled,
+.reject-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.review-message {
+  margin: 13px 0 0;
+  color: #315579;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.audit-section {
+  overflow: hidden;
+  margin-bottom: 28px;
+  border: 1px solid #e1e7f0;
+  border-radius: 14px;
+  background: white;
+  box-shadow: 0 8px 25px rgba(23, 32, 51, 0.05);
+}
+
+.empty-audit {
+  padding: 25px;
+  color: #68758a;
+}
+
+.decision {
+  display: inline-block;
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.decision.approved {
+  background: #e8f8ef;
+  color: #207a46;
+}
+
+.decision.rejected {
+  background: #ffe8e8;
+  color: #ae2929;
+}

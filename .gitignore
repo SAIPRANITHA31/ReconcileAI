@@ -5,4 +5,6 @@ __pycache__/
 *.pyc
 frontend/node_modules/
 frontend/dist/
-
+data/reconcile_ai.db
+data/reconcile_ai.db-shm
+data/reconcile_ai.db-wal

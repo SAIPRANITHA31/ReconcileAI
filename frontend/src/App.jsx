@@ -7,6 +7,12 @@ function App() {
   const [investigation, setInvestigation] = useState(null);
   const [investigatingId, setInvestigatingId] = useState("");
   const [error, setError] = useState("");
+
+  const [reviewNote, setReviewNote] = useState("");
+  const [reviewMessage, setReviewMessage] = useState("");
+  const [reviewing, setReviewing] = useState(false);
+  const [auditEvents, setAuditEvents] = useState([]);
+
   const investigationRef = useRef(null);
 
   useEffect(() => {
@@ -21,43 +27,72 @@ function App() {
           throw new Error("Backend request failed");
         }
 
-        setMetrics(await metricsResponse.json());
-
+        const metricsData = await metricsResponse.json();
         const recordsData = await recordsResponse.json();
+
+        setMetrics(metricsData);
         setRecords(recordsData.records);
       } catch {
         setError(
-          "Could not connect to the backend. Confirm that FastAPI is running."
+          "Could not connect to the backend. Confirm that FastAPI is running on port 8000."
         );
       }
     }
 
     loadDashboard();
   }, []);
+
   useEffect(() => {
-  if (investigation) {
-    investigationRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
+    loadAuditEvents();
+  }, []);
+
+  useEffect(() => {
+    if (investigation) {
+      investigationRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }
+  }, [investigation]);
+
+  async function loadAuditEvents() {
+    try {
+      const response = await fetch(
+        "http://127.0.0.1:8000/api/audit"
+      );
+
+      if (!response.ok) {
+        throw new Error("Could not load audit trail");
+      }
+
+      const data = await response.json();
+      setAuditEvents(data.events);
+    } catch {
+      setAuditEvents([]);
+    }
   }
-}, [investigation]);
 
   async function investigateRecord(paymentId) {
     setInvestigatingId(paymentId);
     setInvestigation(null);
+    setReviewNote("");
+    setReviewMessage("");
     setError("");
 
     try {
       const response = await fetch(
         `http://127.0.0.1:8000/api/investigate/${paymentId}`,
-        { method: "POST" }
+        {
+          method: "POST",
+        }
       );
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.detail || "Investigation failed");
+        throw new Error(
+          data.detail || "Investigation failed"
+        );
       }
 
       setInvestigation(data);
@@ -65,6 +100,57 @@ function App() {
       setError(requestError.message);
     } finally {
       setInvestigatingId("");
+    }
+  }
+
+  async function submitReview(decision) {
+    if (!investigation) {
+      return;
+    }
+
+    if (!reviewNote.trim()) {
+      setReviewMessage(
+        "Please enter a reviewer note before submitting."
+      );
+      return;
+    }
+
+    setReviewing(true);
+    setReviewMessage("");
+
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8000/api/review/${investigation.payment_id}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            decision,
+            note: reviewNote.trim(),
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.detail || "Could not save reviewer decision"
+        );
+      }
+
+      setReviewMessage(
+        `Recommendation ${decision} and recorded in the audit trail.`
+      );
+
+      setReviewNote("");
+      await loadAuditEvents();
+    } catch (reviewError) {
+      setReviewMessage(reviewError.message);
+    } finally {
+      setReviewing(false);
     }
   }
 
@@ -100,7 +186,9 @@ function App() {
       <header className="header">
         <div>
           <p className="eyebrow">AI Finance Controller</p>
+
           <h1>ReconcileAI</h1>
+
           <p className="subtitle">
             Explainable payment and settlement reconciliation
           </p>
@@ -112,24 +200,35 @@ function App() {
         </div>
       </header>
 
-      <section
-       ref={investigationRef}
-         className="investigation-panel">
+      <section className="metric-grid">
         {cards.map((card) => (
-          <article className="metric-card" key={card.label}>
+          <article
+            className="metric-card"
+            key={card.label}
+          >
             <p>{card.label}</p>
             <h2>{card.value}</h2>
           </article>
         ))}
       </section>
 
-      {error && <div className="error-banner">{error}</div>}
+      {error && (
+        <div className="error-banner">
+          {error}
+        </div>
+      )}
 
       {investigation && (
-        <section className="investigation-panel">
+        <section
+          ref={investigationRef}
+          className="investigation-panel"
+        >
           <div className="investigation-heading">
             <div>
-              <p className="eyebrow">Local ML investigation</p>
+              <p className="eyebrow">
+                Local ML investigation
+              </p>
+
               <h2>{investigation.payment_id}</h2>
             </div>
 
@@ -141,16 +240,22 @@ function App() {
           <div className="investigation-grid">
             <div>
               <span>Classification</span>
+
               <strong>
-                {investigation.ai_investigation.category.replaceAll("_", " ")}
+                {investigation.ai_investigation.category.replaceAll(
+                  "_",
+                  " "
+                )}
               </strong>
             </div>
 
             <div>
               <span>ML confidence</span>
+
               <strong>
                 {(
-                  investigation.ai_investigation.confidence * 100
+                  investigation.ai_investigation.confidence *
+                  100
                 ).toFixed(2)}
                 %
               </strong>
@@ -158,6 +263,7 @@ function App() {
 
             <div>
               <span>Recommended action</span>
+
               <strong>
                 {investigation.ai_investigation.recommended_action.replaceAll(
                   "_",
@@ -169,28 +275,170 @@ function App() {
 
           <div className="explanation-box">
             <h3>Investigation explanation</h3>
-            <p>{investigation.ai_investigation.summary}</p>
+
+            <p>
+              {investigation.ai_investigation.summary}
+            </p>
 
             <h3>Evidence used</h3>
+
             <ul>
-              {investigation.ai_investigation.evidence.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
+              {investigation.ai_investigation.evidence.map(
+                (item) => (
+                  <li key={item}>{item}</li>
+                )
+              )}
             </ul>
           </div>
 
           <div className="policy-message">
-            The model can recommend an action, but it cannot modify financial
-            records or approve money-related decisions.
+            The model can recommend an action, but it
+            cannot modify financial records or approve
+            money-related decisions.
+          </div>
+
+          <div className="review-controls">
+            <label htmlFor="review-note">
+              Reviewer note
+            </label>
+
+            <textarea
+              id="review-note"
+              rows="3"
+              value={reviewNote}
+              maxLength={300}
+              placeholder="Explain why you approve or reject this recommendation..."
+              onChange={(event) =>
+                setReviewNote(event.target.value)
+              }
+            />
+
+            <div className="review-actions">
+              <button
+                className="approve-button"
+                disabled={reviewing}
+                onClick={() =>
+                  submitReview("approved")
+                }
+              >
+                {reviewing
+                  ? "Saving..."
+                  : "Approve recommendation"}
+              </button>
+
+              <button
+                className="reject-button"
+                disabled={reviewing}
+                onClick={() =>
+                  submitReview("rejected")
+                }
+              >
+                Reject recommendation
+              </button>
+            </div>
+
+            {reviewMessage && (
+              <p className="review-message">
+                {reviewMessage}
+              </p>
+            )}
           </div>
         </section>
       )}
+
+      <section className="audit-section">
+        <div className="section-heading">
+          <div>
+            <h2>Audit trail</h2>
+
+            <p>
+              Immutable history of human-reviewed AI
+              recommendations
+            </p>
+          </div>
+
+          <span>{auditEvents.length} events</span>
+        </div>
+
+        {auditEvents.length === 0 ? (
+          <p className="empty-audit">
+            No reviewer decisions recorded.
+          </p>
+        ) : (
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Payment</th>
+                  <th>Decision</th>
+                  <th>Classification</th>
+                  <th>Recommended action</th>
+                  <th>ML confidence</th>
+                  <th>Reviewer note</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {auditEvents.map((event) => (
+                  <tr key={event.id}>
+                    <td>
+                      {new Date(
+                        event.created_at
+                      ).toLocaleString()}
+                    </td>
+
+                    <td className="identifier">
+                      {event.payment_id}
+                    </td>
+
+                    <td>
+                      <span
+                        className={`decision ${event.decision}`}
+                      >
+                        {event.decision}
+                      </span>
+                    </td>
+
+                    <td>
+                      {event.classification.replaceAll(
+                        "_",
+                        " "
+                      )}
+                    </td>
+
+                    <td>
+                      {event.recommended_action.replaceAll(
+                        "_",
+                        " "
+                      )}
+                    </td>
+
+                    <td>
+                      {(
+                        event.model_confidence * 100
+                      ).toFixed(2)}
+                      %
+                    </td>
+
+                    <td>{event.note}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       <section className="table-section">
         <div className="section-heading">
           <div>
             <h2>Reconciliation results</h2>
-            <p>AI-assisted analysis of payments and settlements</p>
+
+            <p>
+              AI-assisted analysis of payments and
+              settlements
+            </p>
           </div>
 
           <span>{records.length} records</span>
@@ -213,34 +461,61 @@ function App() {
             <tbody>
               {records.map((record) => (
                 <tr key={record.payment_id}>
-                  <td className="identifier">{record.payment_id}</td>
-                  <td>{record.settlement_id || "—"}</td>
-                  <td>{record.bank_txn_id || "—"}</td>
+                  <td className="identifier">
+                    {record.payment_id}
+                  </td>
 
                   <td>
-                    <span className={`status ${record.status}`}>
+                    {record.settlement_id || "—"}
+                  </td>
+
+                  <td>
+                    {record.bank_txn_id || "—"}
+                  </td>
+
+                  <td>
+                    <span
+                      className={`status ${record.status}`}
+                    >
                       {record.status}
                     </span>
                   </td>
 
-                  <td>{Math.round(record.confidence * 100)}%</td>
+                  <td>
+                    {Math.round(
+                      record.confidence * 100
+                    )}
+                    %
+                  </td>
+
                   <td>{record.reason}</td>
 
                   <td>
-                    {["review", "unresolved"].includes(record.status) ? (
+                    {[
+                      "review",
+                      "unresolved",
+                    ].includes(record.status) ? (
                       <button
                         className="investigate-button"
-                        disabled={investigatingId === record.payment_id}
+                        disabled={
+                          investigatingId ===
+                          record.payment_id
+                        }
                         onClick={() =>
-                          investigateRecord(record.payment_id)
+                          investigateRecord(
+                            record.payment_id
+                          )
                         }
                       >
-                        {investigatingId === record.payment_id
+                        {investigatingId ===
+                        record.payment_id
                           ? "Analyzing..."
                           : "Investigate"}
                       </button>
                     ) : (
-                      <span className="not-required">Not required</span>
+                      <span className="not-required">
+                        Not required
+                      </span>
                     )}
                   </td>
                 </tr>
