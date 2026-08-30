@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import "./App.css";
 
+const API_BASE =
+  import.meta.env.VITE_API_URL ||
+  "http://127.0.0.1:8000";
+
 function App() {
   const [metrics, setMetrics] = useState(null);
   const [records, setRecords] = useState([]);
@@ -19,8 +23,8 @@ function App() {
     async function loadDashboard() {
       try {
         const [metricsResponse, recordsResponse] = await Promise.all([
-          fetch("http://127.0.0.1:8000/api/metrics"),
-          fetch("http://127.0.0.1:8000/api/reconciliation"),
+          fetch(`${API_BASE}/api/metrics`),
+          fetch(`${API_BASE}/api/reconciliation`),
         ]);
 
         if (!metricsResponse.ok || !recordsResponse.ok) {
@@ -57,9 +61,7 @@ function App() {
 
   async function loadAuditEvents() {
     try {
-      const response = await fetch(
-        "http://127.0.0.1:8000/api/audit"
-      );
+      const response = await fetch(`${API_BASE}/api/audit`);
 
       if (!response.ok) {
         throw new Error("Could not load audit trail");
@@ -81,7 +83,7 @@ function App() {
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/investigate/${paymentId}`,
+        `${API_BASE}/api/investigate/${paymentId}`,
         {
           method: "POST",
         }
@@ -120,7 +122,7 @@ function App() {
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/review/${investigation.payment_id}`,
+        `${API_BASE}/api/review/${investigation.payment_id}`,
         {
           method: "POST",
           headers: {

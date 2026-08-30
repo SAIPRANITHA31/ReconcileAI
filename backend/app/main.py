@@ -1,5 +1,7 @@
+
 from __future__ import annotations
 
+import os
 from collections import Counter
 from pathlib import Path
 from typing import Literal
@@ -21,6 +23,18 @@ ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT / "data" / "sample"
 TRUTH_PATH = ROOT / "data" / "ground_truth" / "matches.csv"
 
+FRONTEND_URL = os.getenv(
+    "FRONTEND_URL",
+    "http://localhost:5173",
+)
+
+allowed_origins = list(
+    {
+        "http://localhost:5173",
+        FRONTEND_URL.rstrip("/"),
+    }
+)
+
 app = FastAPI(
     title="ReconcileAI API",
     version="0.2.0",
@@ -32,7 +46,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
