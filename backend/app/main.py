@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import os
@@ -19,21 +18,28 @@ from backend.app.audit import (
 from backend.app.evaluation import evaluate
 from backend.app.matching.engine import reconcile
 
+
 ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT / "data" / "sample"
 TRUTH_PATH = ROOT / "data" / "ground_truth" / "matches.csv"
 
+
 FRONTEND_URL = os.getenv(
     "FRONTEND_URL",
     "http://localhost:5173",
-)
+).rstrip("/")
 
-allowed_origins = list(
-    {
-        "http://localhost:5173",
-        FRONTEND_URL.rstrip("/"),
-    }
-)
+
+allowed_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:4173",
+    "http://127.0.0.1:4173",
+    "http://localhost:4174",
+    "http://127.0.0.1:4174",
+    FRONTEND_URL,
+]
+
 
 app = FastAPI(
     title="ReconcileAI API",
@@ -44,12 +50,15 @@ app = FastAPI(
     ),
 )
 
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 initialize_audit_database()
 
@@ -67,6 +76,15 @@ def current_results():
     return reconcile(DATA_DIR)
 
 
+@app.get("/")
+def root() -> dict:
+    return {
+        "status": "ok",
+        "service": "reconcile-ai",
+        "message": "ReconcileAI API is running",
+    }
+
+
 @app.get("/health")
 def health() -> dict:
     return {
@@ -81,7 +99,10 @@ def reconciliation() -> dict:
 
     return {
         "summary": dict(
-            Counter(item.status for item in results)
+            Counter(
+                item.status
+                for item in results
+            )
         ),
         "records": [
             item.to_dict()
@@ -91,7 +112,9 @@ def reconciliation() -> dict:
 
 
 @app.get("/api/reconciliation/{payment_id}")
-def reconciliation_detail(payment_id: str) -> dict:
+def reconciliation_detail(
+    payment_id: str,
+) -> dict:
     result = next(
         (
             item
@@ -119,7 +142,9 @@ def metrics() -> dict:
 
 
 @app.post("/api/investigate/{payment_id}")
-def investigate(payment_id: str) -> dict:
+def investigate(
+    payment_id: str,
+) -> dict:
     result = next(
         (
             item
@@ -135,7 +160,10 @@ def investigate(payment_id: str) -> dict:
             detail="Payment not found",
         )
 
-    if result.status not in {"review", "unresolved"}:
+    if result.status not in {
+        "review",
+        "unresolved",
+    }:
         raise HTTPException(
             status_code=400,
             detail=(
@@ -152,7 +180,9 @@ def investigate(payment_id: str) -> dict:
         return {
             "payment_id": payment_id,
             "reconciliation": result.to_dict(),
-            "ai_investigation": investigation.model_dump(),
+            "ai_investigation": (
+                investigation.model_dump()
+            ),
             "policy": {
                 "automatic_financial_action": False,
                 "human_approval_required": True,
@@ -163,7 +193,8 @@ def investigate(payment_id: str) -> dict:
         raise HTTPException(
             status_code=503,
             detail=(
-                f"AI investigation unavailable: {error}"
+                "AI investigation unavailable: "
+                f"{error}"
             ),
         ) from error
 
@@ -188,7 +219,10 @@ def review_recommendation(
             detail="Payment not found",
         )
 
-    if result.status not in {"review", "unresolved"}:
+    if result.status not in {
+        "review",
+        "unresolved",
+    }:
         raise HTTPException(
             status_code=400,
             detail=(
@@ -196,26 +230,42 @@ def review_recommendation(
             ),
         )
 
-    investigation = investigate_exception(
-        result.to_dict()
-    )
+    try:
+        investigation = investigate_exception(
+            result.to_dict()
+        )
 
-    event = record_review(
-        payment_id=payment_id,
-        decision=request.decision,
-        classification=investigation.category,
-        recommended_action=(
-            investigation.recommended_action
-        ),
-        model_confidence=investigation.confidence,
-        note=request.note.strip(),
-    )
+        event = record_review(
+            payment_id=payment_id,
+            decision=request.decision,
+            classification=(
+                investigation.category
+            ),
+            recommended_action=(
+                investigation.recommended_action
+            ),
+            model_confidence=(
+                investigation.confidence
+            ),
+            note=request.note.strip(),
+        )
 
-    return {
-        "message": "Reviewer decision recorded",
-        "event": event,
-        "source_financial_record_modified": False,
-    }
+        return {
+            "message": (
+                "Reviewer decision recorded"
+            ),
+            "event": event,
+            "source_financial_record_modified": False,
+        }
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Review processing unavailable: "
+                f"{error}"
+            ),
+        ) from error
 
 
 @app.get("/api/audit")
